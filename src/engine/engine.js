@@ -43,6 +43,10 @@ class BoardState{
         let optionSteps=ALL^(this.selfState|this.enemyState);
         return toArray(optionSteps);
     }
+    isDraw(){
+        let optionSteps=ALL^(this.selfState|this.enemyState);
+        return optionSteps==0;
+    }
     isVictory(){//满足获胜条件，棋局终止
         return this.chance==Chances.Enemy&&victorySates.some(it=>(it&this.selfState)==it);
     }
