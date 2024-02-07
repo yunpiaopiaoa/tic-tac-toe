@@ -14,6 +14,8 @@ const data=reactive({
     dialogVisible:false,
     message:"",
     gameOver:false,
+    playerFirst:true,
+    invincible:false,
 })
 function click(index) {
     if (data.gameOver || (arr[index] != Empty)) {
@@ -30,11 +32,11 @@ function click(index) {
     }
     // console.log(arr);
 }
-function newGame(isfirst) {
+function newGame(isfirst,invincible) {
     for (let i = 0; i < arr.length; i++) {
         arr[i] = Empty;
     }
-    let res = manager.newGame(isfirst);
+    let res = manager.newGame(isfirst,invincible);
     // console.log(res);
     if (res.index != undefined) {
         arr[res.index] = Enemy;
@@ -42,7 +44,7 @@ function newGame(isfirst) {
     data.gameOver = false;
 }
 onMounted(() => {
-    newGame(true);
+    newGame(data.playerFirst,data.invincible);
 })
 </script>
 
@@ -58,8 +60,13 @@ onMounted(() => {
         </div>
     </div>
     <br />
-    <el-button @click="newGame(true)">重新开始（先手）</el-button>
-    <el-button @click="newGame(false)">重新开始（后手）</el-button>
+    <el-radio v-model="data.playerFirst" :label="true">先手</el-radio>
+    <el-radio v-model="data.playerFirst" :label="false">后手</el-radio>
+    <br />
+    <el-radio v-model="data.invincible" :label="false">一般</el-radio>
+    <el-radio v-model="data.invincible" :label="true">无敌</el-radio>
+    <br />
+    <el-button @click="newGame(data.playerFirst,data.invincible)">重新开始</el-button>
     <el-dialog v-model="data.dialogVisible" title="提示" width="30%" >
         <div>{{data.message}}</div>
         <template #footer>

@@ -1,79 +1,77 @@
-import { Chances,BoardState,Engine } from "./engine";
+import { BoardState,Engine } from "./engine";
 class Manager{
     constructor(){
-        this.boardSate=new BoardState(Chances.Self);
         this.engine=new Engine();
-        this.isfirst=null;
+        this.boardSate=null;
+        this.playerFirst=null;
+        this.invincible=null;
     }
-    newGame(isfirst){
-        this.isfirst=isfirst;
-        this.boardSate=new BoardState(Chances.Enemy);
-        if(isfirst){
-            // this.boardSate=new BoardState(Chances.Enemy);
-            return {index:null,gameStatus:null};
-        }
-        else{
-            // this.boardSate=new BoardState(Chances.Self);
-            return this.f();
-        }
+    newGame(playerFirst,invincible){
+        this.playerFirst=playerFirst;
+        this.invincible=invincible;
+        console.log(invincible);
+        this.boardSate=new BoardState();
+        return playerFirst?{index:null,gameStatus:null}:this.enemyMove();
     }
     solve(index){
         this.boardSate.setNextStep(index);
-        if(this.boardSate.isVictory()){
-            let res= {index:null,gameStatus:this.isfirst?"lose":"win"};
-            return res;
-        }
-        else if(this.boardSate.isFail()){
-            let res= {index:null,gameStatus:this.isfirst?"win":"lose"};
-            return res;
-        }
-        else if(this.boardSate.isDraw()){
-            let res= {index:null,gameStatus:"draw"};
-            return res;
-        }
-        // console.log("玩家下棋后棋盘状态:")
-        // console.log(this.boardSate);
-        return this.f();
+        let gameStatus=this.judgeGameStatus();
+        return gameStatus==null?this.enemyMove():{index:null,gameStatus:gameStatus};
     }
-    f(){
-        let nextSteps=this.engine.getNextSteps(this.boardSate);
-        // console.log("可选下一步：");
-        // console.log(nextSteps);
-        if(!this.isfirst){
+    selectFrom(nextSteps){
+        if(this.playerFirst){
             [nextSteps.victorySteps,nextSteps.failSteps]=[nextSteps.failSteps,nextSteps.victorySteps];
         }
-        let selectStep=-1;
-        if(nextSteps.victorySteps.length>0){
-            selectStep=nextSteps.victorySteps[Math.floor(Math.random()*nextSteps.victorySteps.length)];
+        function choice(array){
+            return array[Math.floor(Math.random()*array.length)];
         }
-        else if(nextSteps.optionSteps.length>0){
-            let tmp=nextSteps.optionSteps.filter(it=>!nextSteps.failSteps.includes(it))
-            // console.log(tmp)
-            if(tmp.length>0){
-                selectStep=tmp[Math.floor(Math.random()*tmp.length)];
+        let selectStep=-1;
+        // console.log(this.invincible)
+        if(this.invincible){//不可战胜模式，选择策略优先顺序为victorySteps>commonSteps>failSteps
+            if(nextSteps.victorySteps.length>0){
+                selectStep=choice(nextSteps.victorySteps);
+            }
+            else if(nextSteps.commonSteps.length>0){
+                selectStep=choice(nextSteps.commonSteps);
             }
             else{
-                selectStep=nextSteps.optionSteps[Math.floor(Math.random()*nextSteps.optionSteps.length)];
+                selectStep=choice(nextSteps.failSteps);
             }
         }
-        // else{
-        //     selectStep=nextSteps.failSteps[Math.floor(Math.random()*nextSteps.victorySteps.length)];
-        // }
-        let res= {index:selectStep,gameStatus:null};
-        this.boardSate.setNextStep(selectStep);
-        // console.log("机器下棋后棋盘状态:")
-        // console.log(this.boardSate);
+        else{//一般模式，选择策略为随机
+            let tmp=[];
+            if(nextSteps.victorySteps.length>0){
+                tmp.push(choice(nextSteps.victorySteps));
+            }
+            if(nextSteps.commonSteps.length>0){
+                tmp.push(choice(nextSteps.commonSteps));
+            }
+            if(nextSteps.failSteps.length>0){
+                tmp.push(choice(nextSteps.failSteps));
+            }
+            console.log(tmp);
+            selectStep=choice(tmp);
+        }
+
+        return selectStep;
+    }
+    judgeGameStatus(){
         if(this.boardSate.isVictory()){
-            res= {index:selectStep,gameStatus:this.isfirst?"lose":"win"};
+            return this.playerFirst?"win":"lose";
         }
-        else if(this.boardSate.isFail()){
-            res= {index:selectStep,gameStatus:this.isfirst?"win":"lose"};
+        if(this.boardSate.isFail()){
+            return this.playerFirst?"lose":"win";
         }
-        else if(this.boardSate.isDraw()){
-            res= {index:selectStep,gameStatus:"draw"};
+        if(this.boardSate.isDraw()){
+            return "draw";
         }
-        // console.log("机器选择步骤以及结果：");
-        // console.log(res);
+        return null;
+    }
+    enemyMove(){
+        let nextSteps=this.engine.getNextSteps(this.boardSate);
+        let selectStep=this.selectFrom(nextSteps);
+        this.boardSate.setNextStep(selectStep);
+        let res= {index:selectStep,gameStatus:this.judgeGameStatus()};
         console.log(nextSteps);
         console.log(this.engine.getNextSteps(this.boardSate));
         return res;
