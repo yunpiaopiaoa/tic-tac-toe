@@ -1,154 +1,133 @@
-const Chances = {
-    Self: Symbol('self'),
-    Enemy: Symbol('enemy')
-}
-const BoardSize=9;
-const ALL=(1<<BoardSize) -1;
-const VictorySates=[
-    (1<<0)|(1<<3)|(1<<6),
-    (1<<1)|(1<<4)|(1<<7),
-    (1<<2)|(1<<5)|(1<<8),
-    (1<<0)|(1<<1)|(1<<2),
-    (1<<3)|(1<<4)|(1<<5),
-    (1<<6)|(1<<7)|(1<<8),
-    (1<<0)|(1<<4)|(1<<8),
-    (1<<2)|(1<<4)|(1<<6),
+const BoardSize = 9;
+const ALL = (1 << BoardSize) - 1;
+const VictorySates = [
+    (1 << 0) | (1 << 3) | (1 << 6),
+    (1 << 1) | (1 << 4) | (1 << 7),
+    (1 << 2) | (1 << 5) | (1 << 8),
+    (1 << 0) | (1 << 1) | (1 << 2),
+    (1 << 3) | (1 << 4) | (1 << 5),
+    (1 << 6) | (1 << 7) | (1 << 8),
+    (1 << 0) | (1 << 4) | (1 << 8),
+    (1 << 2) | (1 << 4) | (1 << 6),
 ]
-function toArray(state){
-    let res=[];
-    for(let i=0;i<BoardSize;i++){
-        if(state &(1<<i)){
+function toArray(state) {
+    let res = [];
+    for (let i = 0; i < BoardSize; i++) {
+        if (state & (1 << i)) {
             res.push(i);
         }
     }
     return res;
 }
-class BoardState{
-    constructor(chance=Chances.Self){//默认构造以己方为先手
-        this.chance=chance;
-        this.selfState=0;
-        this.enemyState=0;
+class BoardState {
+    constructor() {
+        //默认chance初始值为0，即0先手，1后手
+        this.chance = 0;
+        this.states = [0, 0];
     }
-    setNextStep(index){
-        if(this.chance==Chances.Self){
-            this.selfState |=1<<index;
-            this.chance =Chances.Enemy;
-        }
-        else{
-            this.enemyState |=1<<index;
-            this.chance=Chances.Self;
-        }
+    setNextStep(index) {
+        this.states[this.chance] |= 1 << index;
+        this.chance ^= 1;
     }
-    _getOptionalBits(){
-        return ALL^(this.selfState|this.enemyState);
+    _getOptionalBits() {
+        return ALL ^ (this.states[0] | this.states[1]);
     }
-    getOptionalSteps(){
+    getOptionalSteps() {
         return toArray(this._getOptionalBits());
     }
-    isDraw(){
-        return this._getOptionalBits()==0;
+    isDraw() {
+        return this._getOptionalBits() == 0;
     }
-    isVictory(){//满足获胜条件，棋局终止
-        return this.chance==Chances.Enemy&&VictorySates.some(it=>(it&this.selfState)==it);
+    //判断当前棋手是否失败
+    isFail() {
+        let prePlayer = this.chance ^ 1;
+        return VictorySates.some(it => (it & this.states[prePlayer]) == it);
     }
-    isFail(){
-        return this.chance==Chances.Self&&VictorySates.some(it=>(it&this.enemyState)==it);
-    }
-    hash(){
-        return (this.selfState<<BoardSize)|(this.enemyState);
+    hash() {
+        return (this.states[0] << BoardSize) | (this.states[1]);
     }
 }
-class Record extends BoardState{
-    constructor(){
+class Record extends BoardState {
+    constructor() {
         super();
-        this.victorySteps=0;
-        this.failSteps=0;
+        this.victorySteps = 0;
+        this.failSteps = 0;
     }
-    getCommonSteps(){
-        return toArray(this._getOptionalBits()^(this.victorySteps|this.failSteps));
+    //copy函数访问了父类变量，如何改进？
+    copy() {
+        let ret = new Record();
+        ret.chance = this.chance;
+        ret.states[0] = this.states[0];
+        ret.states[1] = this.states[1];
+        ret.victorySteps = this.victorySteps;
+        ret.failSteps = this.failSteps;
+        return ret;
     }
-    setVictorySteps(step){
-        this.victorySteps |=1<<step;
+    setVictorySteps(step) {
+        this.victorySteps |= 1 << step;
     }
-    getVictorySteps(){
+    getVictorySteps() {
         return toArray(this.victorySteps);
     }
-    setFailSteps(step){
-        this.failSteps |=1<<step;
+    setFailSteps(step) {
+        this.failSteps |= 1 << step;
     }
-    getFailSteps(){
+    getFailSteps() {
         return toArray(this.failSteps);
     }
-    willbeVictory(){//处于必胜态
-        if(this.isVictory()){
-            return true;
-        }
-        if(this.chance==Chances.Enemy){
-            let optionSteps=this._getOptionalBits();
-            if(optionSteps!=0&&optionSteps==this.victorySteps){
-                return true;
-            }
-        }
-        else{
-            if(this.victorySteps!=0){
-                return true;
-            }
-        }
-        return false;
+    //当前棋手是否处于必胜态
+    willbeVictory() {
+        return this.victorySteps != 0;
     }
-    willbeFail(){//处于必败状态
-        if(this.isFail()){
+    //当前棋手是否处于必败状态
+    willbeFail() {
+        if (this.isFail()) {
             return true;
         }
-        if(this.chance==Chances.Enemy){
-            if(this.failSteps!=0){
-                return true;
-            }
-        }
-        else{
-            let optionSteps=this._getOptionalBits();
-            if(optionSteps!=0&&optionSteps==this.failSteps){
-                return true;
-            }
-        }
-        return false;
+        let optionSteps = this._getOptionalBits();
+        return optionSteps != 0 && optionSteps == this.failSteps;
     }
 }
-class Engine{
-    constructor(){
-        this.dictionary=new Map()//记录Record的hash:Record
-        let initRecord=new Record();//己方先手
+class Engine {
+    constructor() {
+        this.dictionary = new Map()//记录Record的hash:Record
+        let initRecord = new Record();
         this.dfs(initRecord);
         console.log(this.dictionary.size);
     }
-    dfs(record){
-        if(!(record.isVictory()|| record.isFail())){
-            let tmp=Object.assign(Object.create(Object.getPrototypeOf(record)), record);
-            for(let step of tmp.getOptionalSteps()){
-                let nextRecord=Object.assign(Object.create(Object.getPrototypeOf(tmp)), tmp);
+    dfs(record) {
+        if (!record.isFail()) {
+            let tmp = record.copy();
+            for (let step of tmp.getOptionalSteps()) {
+                let nextRecord = tmp.copy();
                 nextRecord.setNextStep(step);
-                this.dfs(nextRecord);
-                if(nextRecord.willbeVictory()){
-                    record.setVictorySteps(step);
+                //避免重复搜索棋面
+                if (this.dictionary.has(nextRecord.hash())) {
+                    nextRecord=this.dictionary.get(nextRecord.hash());
                 }
-                else if(nextRecord.willbeFail()){
+                else{
+                    this.dfs(nextRecord);
+                }
+                if (nextRecord.willbeVictory()) {
                     record.setFailSteps(step);
+                }
+                else if (nextRecord.willbeFail()) {
+                    record.setVictorySteps(step);
                 }
             }
         }
-        this.dictionary.set(record.hash(),record);
+        this.dictionary.set(record.hash(), record);
     }
 
     //state为BoardState类型
     //返回值为一个对象，分别为可选步(不包括必胜步和必败步)，必胜步，必败步
-    getNextSteps(state){
-        let record= this.dictionary.get(state.hash());
+    getNextSteps(state) {
+        let record = this.dictionary.get(state.hash());
         return {
-            commonSteps: record.getCommonSteps(),
             victorySteps: record.getVictorySteps(),
             failSteps: record.getFailSteps(),
+            optionalSteps: record.getOptionalSteps(),
         }
     }
 }
-// new Engine();
-export{BoardState,Engine};
+export { BoardState, Engine };
