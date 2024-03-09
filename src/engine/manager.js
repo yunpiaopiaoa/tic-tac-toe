@@ -3,11 +3,9 @@ class Manager {
     constructor() {
         this.engine = new Engine();
         this.boardSate = null;
-        this.playerFirst = null;
         this.invincible = null;
     }
     newGame(playerFirst, invincible) {
-        this.playerFirst = playerFirst;
         this.invincible = invincible;
         this.boardSate = new BoardState();
         return playerFirst ? { index: null, gameStatus: null } : this.enemyMove();
